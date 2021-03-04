@@ -75,6 +75,7 @@
 #' @seealso \code{\link{nnls}}
 #' @md
 #' @import Matrix RcppArmadillo
+#' @importFrom methods as
 #'
 nmf <- function(A, k, min = c(0, 0), max = c(NULL, NULL), L0 = c(NULL, NULL), L1 = c(0, 0),
     L2 = c(0, 0), PE = c(0, 0), exact = c(FALSE, FALSE), cd = c(TRUE, TRUE), maxit = 100,
@@ -86,6 +87,16 @@ nmf <- function(A, k, min = c(0, 0), max = c(NULL, NULL), L0 = c(NULL, NULL), L1
   if (is.null(L0[2])) L0[2] <- k
   if (is.null(max)) max <- c(min[1], min[2])
   A <- as(A, "dgCMatrix")
+  
+  check_sanity <- function(n, L0) {
+    msg <- "You have requested an exact solution in a very large feasible set search space. 
+  Please be sure you wish to proceed. If so, specify \"check_exact = FALSE\" in your function call."
+    if (L0 != n) {
+      if ((L0 > 10 && n > 15) || (L0 > 7 && n > 50) || (L0 > 5 && n > 100) || (L0 > 3 && n > 200) ||
+          (L0 > 1 && n > 500)) stop(msg)
+    } else if (n > 15) stop(msg)
+  }
+  
   if (any(exact == TRUE) || any(L0 != k)) {
     check_exact <- is.null(list(...)$check_exact)
     if (check_exact) check_sanity(k, L0[1])
@@ -94,13 +105,4 @@ nmf <- function(A, k, min = c(0, 0), max = c(NULL, NULL), L0 = c(NULL, NULL), L1
   return(c_nmf(A, k, min[1], min[2], max[1], max[2], maxit_cd, tol_cd, L0[1], L0[2], L1[1], L1[2],
   L2[1], L2[2], PE[1], PE[2], exact[1], exact[2], cd[1], cd[2], maxit, tol, threads, diag, seed,
   verbose))
-}
-
-check_sanity <- function(n, L0) {
-  msg <- "You have requested an exact solution in a very large feasible set search space. 
-  Please be sure you wish to proceed. If so, specify \"check_exact = FALSE\" in your function call."
-  if (L0 != n) {
-    if ((L0 > 10 && n > 15) || (L0 > 7 && n > 50) || (L0 > 5 && n > 100) || (L0 > 3 && n > 200) ||
-      (L0 > 1 && n > 500)) stop(msg)
-  } else if (n > 15) stop(msg)
 }

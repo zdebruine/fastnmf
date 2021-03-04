@@ -5,14 +5,6 @@ c_nnls <- function(A, B, X, values, threads = 0L, min = 0, max = 0, maxit = 50L,
     .Call(`_amf_c_nnls`, A, B, X, values, threads, min, max, maxit, tol, L0, L1, L2, PE, exact, cd)
 }
 
-diagnorm <- function(x, d, threads) {
-    .Call(`_amf_diagnorm`, x, d, threads)
-}
-
-diagmult <- function(x, d, threads) {
-    .Call(`_amf_diagmult`, x, d, threads)
-}
-
 c_nmf <- function(A, k, min_w = 0, min_h = 0, max_w = 0, max_h = 0, cd_maxit = 50L, cd_tol = 1e-8, L0_w = 0, L0_h = 0, L1_w = 0, L1_h = 0, L2_w = 0, L2_h = 0, PE_w = 0, PE_h = 0, exact_h = FALSE, exact_w = FALSE, cd_w = TRUE, cd_h = TRUE, maxit = 100L, tol = 0.01, threads = 0L, diag = TRUE, seed = 0L, verbose = TRUE) {
     .Call(`_amf_c_nmf`, A, k, min_w, min_h, max_w, max_h, cd_maxit, cd_tol, L0_w, L0_h, L1_w, L1_h, L2_w, L2_h, PE_w, PE_h, exact_h, exact_w, cd_w, cd_h, maxit, tol, threads, diag, seed, verbose)
 }

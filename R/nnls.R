@@ -101,6 +101,7 @@
 #' @export
 #' @md
 #' @import Matrix RcppArmadillo
+#' @importFrom methods as
 #' @examples
 #' A <- matrix(runif(25*10), 25, 10)
 #' B <- matrix(runif(25*1000)*0.1, 25, 1000)
@@ -116,15 +117,17 @@ nnls <- function(a, b, x_init = NULL, min = 0, max = NULL, values = NULL, L0 = N
   if ("numeric" %in% class(b)) b <- as.matrix(b)
   if (!("dgcMatrix" %in% class(b))) b <- as(b, "dgCMatrix")
   if (is.null(L0)) L0 = 0
-  if (check_exact && L0 != 0) check_sanity(ncol(A), L0)
+  if (check_exact && L0 != 0) {
+    n <- ncol(A)
+    msg <- "You have requested an exact solution in a very large feasible set search space. 
+  Please be sure you wish to proceed. If so, specify \"check_exact = FALSE\" in your function call."
+    if (L0 != n) {
+      if ((L0 > 10 && n > 15) || (L0 > 7 && n > 50) || (L0 > 5 && n > 100) || (L0 > 3 && n > 200) ||
+          (L0 > 1 && n > 500)) stop(msg)
+    } else if (n > 15) stop(msg)
+  }
   return(c_nnls(a, b, x_init, values, threads, min, max, maxit, tol, L0, L1, L2, PE, exact, cd))
 }
 
 check_sanity <- function(n, L0) {
-  msg <- "You have requested an exact solution in a very large feasible set search space. 
-  Please be sure you wish to proceed. If so, specify \"check_exact = FALSE\" in your function call."
-  if (L0 != n) {
-    if ((L0 > 10 && n > 15) || (L0 > 7 && n > 50) || (L0 > 5 && n > 100) || (L0 > 3 && n > 200) ||
-      (L0 > 1 && n > 500)) stop(msg)
-  } else if (n > 15) stop(msg)
 }
