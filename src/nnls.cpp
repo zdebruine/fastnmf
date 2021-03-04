@@ -315,7 +315,6 @@ arma::mat c_nnls(arma::mat& A, arma::sp_mat& B, arma::mat X, const arma::vec& va
     return(X);
 }
 
-//[[Rcpp::export]]
 arma::mat diagnorm(arma::mat& x, arma::vec& d, const unsigned int threads) {
 #pragma omp parallel for num_threads(threads) schedule(dynamic)
     for (unsigned int i = 0; i < x.n_cols; ++i)
@@ -331,7 +330,6 @@ double calc_tol(arma::mat& h1, arma::mat& h2, const unsigned int threads) {
     return(tol);
 }
 
-//[[Rcpp::export]]
 arma::mat diagmult(arma::mat x, arma::vec d, const unsigned int threads) {
 #pragma omp parallel for num_threads(threads) schedule(dynamic)
     for (unsigned int i = 0; i < x.n_cols; ++i)
