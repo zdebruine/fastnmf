@@ -118,7 +118,7 @@ nnls <- function(a, b, x_init = NULL, min = 0, max = NULL, values = NULL, L0 = N
   if (!("dgcMatrix" %in% class(b))) b <- as(b, "dgCMatrix")
   if (is.null(L0)) L0 = 0
   if (check_exact && L0 != 0) {
-    n <- ncol(A)
+    n <- ncol(a)
     msg <- "You have requested an exact solution in a very large feasible set search space. 
   Please be sure you wish to proceed. If so, specify \"check_exact = FALSE\" in your function call."
     if (L0 != n) {
