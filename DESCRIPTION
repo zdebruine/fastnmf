@@ -1,0 +1,18 @@
+Package: amf
+Type: Package
+Title: Alternating Matrix Factorization by Non-negative Least Squares
+Version: 1.0
+Date: 2021-03-04
+Author: Zach DeBruine [aut, cre]
+Maintainer: Zach DeBruine <zach.debruine@vai.org>
+Description: Fast and adaptive solvers for constrained least squares and matrix factorizations.
+License: GPL (>=2)
+Imports: Rcpp (>= 1.0.3), Matrix, knitr, methods, utils, ggplot2, data.table, reshape2
+Encoding: UTF-8
+LazyData: true
+LinkingTo: Rcpp, RcppArmadillo
+VignetteBuilder: knitr
+Depends: R (>= 3.5.0)
+BugReports: https://github.com/zdebruine/amf/issues
+URL: https://github.com/zdebruine/amf
+RoxygenNote: 7.1.1
