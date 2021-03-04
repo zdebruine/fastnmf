@@ -1,3 +1,5 @@
 useDynLib(amf, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
+importFrom(methods, as)
+import(Matrix)
 exportPattern("^[[:alpha:]]+")
