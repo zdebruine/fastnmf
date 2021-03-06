@@ -1,11 +1,11 @@
-Package: amf
+Package: fastnmf
 Type: Package
-Title: Alternating Matrix Factorization by Non-negative Least Squares
+Title: Fast non-negative matrix factorization by alternating least squares
 Version: 1.0
-Date: 2021-03-04
+Date: 2021-03-05
 Author: Zach DeBruine [aut, cre]
 Maintainer: Zach DeBruine <zach.debruine@vai.org>
-Description: Fast and adaptive solvers for constrained least squares and matrix factorizations.
+Description: Fast and adaptive solvers for constrained least squares and matrix factorization.
 License: GPL (>=2)
 Imports: Rcpp (>= 1.0.3), Matrix, knitr, methods, utils, ggplot2, data.table, reshape2
 Encoding: UTF-8
