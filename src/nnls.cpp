@@ -258,15 +258,13 @@ arma::mat c_nnls(arma::mat& A, arma::sp_mat& B, arma::mat X, const arma::vec& va
         a.diag() += L2penalty - PEpenalty;
     }
 
-    // make sure input won't throw a logical error and crash the session
-    if (B.n_cols == A.n_cols && B.n_rows != A.n_cols) B = B.t();
-    if (B.n_rows != A.n_cols) Rcpp::stop("dimensions of A and B are incompatible!");
-
     if (sum(sum(X)) == 0) X = arma::mat(A.n_rows, B.n_cols, arma::fill::zeros);
     else {
-        if (X.n_cols == A.n_cols && X.n_rows == B.n_cols) inplace_trans(X);
-        else if (X.n_rows != A.n_cols || X.n_cols != B.n_cols)
-            Rcpp::stop("dimensions of initial X is incompatible with A and B");
+        // initial X has been provided, verify correct dimensions
+        if (a.n_rows != X.n_rows)
+            Rcpp::stop("The number of rows in X must be the same as the edge length in 'a'");
+        if (X.n_cols != B.n_cols)
+            Rcpp::stop("The number of columns in X must be the same as the number of columns in B");
     }
 
     // don't be doing multithreading on more threads than there are tasks
@@ -295,7 +293,7 @@ arma::mat c_nnls(arma::mat& A, arma::sp_mat& B, arma::mat X, const arma::vec& va
         if (mode == 3) {
             arma::vec x = X.col(i);
             arma::vec b0(x.n_rows);
-            if (!sympd) b0 = a * B.col(i);
+            if (!sympd) b0 = A * B.col(i);
             else b0 = B.col(i);
             if (L1 != 0) b0 -= (L1 * b0.max());
             arma::vec b = a * x - b0;
@@ -313,6 +311,73 @@ arma::mat c_nnls(arma::mat& A, arma::sp_mat& B, arma::mat X, const arma::vec& va
         }
     }
     return(X);
+}
+
+// LOSS FUNCTIONS
+
+double add_penalty(const arma::mat& X, const double L1, const double L2, const double PE) {
+    double loss = 0;
+    if (L1 != 0) loss += L1 * arma::sum(arma::sum(X));
+    if (L2 != PE) loss += 0.5 * (L2 - PE) * arma::sum(arma::sum(arma::square(X)));
+    if (PE != 0) loss += 0.5 * PE * arma::sum(arma::sum(X * X.t()));
+    return(loss);
+}
+
+//[[Rcpp::export]]
+Rcpp::List c_sample_loss(const arma::mat& w, const arma::vec& d, const arma::mat& h,
+    arma::sp_mat& A, const double L1_w = 0, const double L1_h = 0,
+    const double L2_w = 0, const double L2_h = 0, const double PE_w = 0,
+    const double PE_h = 0, const unsigned int loss_type = 1,
+    const unsigned int threads = 0) {
+
+    double penalty = 0;
+    if (L1_w > 0 || L2_w > 0 || PE_w > 0) penalty += add_penalty(w, L1_w, L2_w, PE_w);
+    if (L1_h > 0 || L2_h > 0 || PE_h > 0) penalty += add_penalty(h, L1_h, L2_h, PE_h);
+    penalty /= A.n_elem;
+
+    // calculate total loss for all samples
+    arma::vec losses = arma::zeros(A.n_cols);
+    arma::mat wd = w * diagmat(d);
+    #pragma omp parallel for num_threads(threads) schedule(dynamic)
+    for (unsigned int j = 0; j < A.n_cols; ++j) {
+        arma::vec wdh_j = wd * h.col(j);
+        arma::sp_mat::col_iterator it = A.begin_col(j);
+        arma::sp_mat::col_iterator it_end = A.end_col(j);
+        for (; it != it_end; ++it) wdh_j(it.row()) -= *it;
+        if (loss_type == 1) losses(j) = arma::mean(arma::square(wdh_j));
+        else losses(j) = arma::mean(arma::abs(wdh_j));
+    }
+    double net_loss = arma::mean(losses);
+
+    return(Rcpp::List::create(
+        Rcpp::Named("loss") = net_loss,
+        Rcpp::Named("penalty") = penalty,
+        Rcpp::Named("tot_loss") = net_loss + penalty,
+        Rcpp::Named("sample_losses") = losses));
+}
+
+double c_loss(const arma::mat& w, const arma::vec& d, const arma::mat& h,
+                  arma::sp_mat& A, const double L1_w = 0, const double L1_h = 0,
+                  const double L2_w = 0, const double L2_h = 0, const double PE_w = 0,
+                  const double PE_h = 0, const unsigned int loss_type = 1,
+                  const unsigned int threads = 0) {
+    
+    double tot_loss = 0;
+    if (L1_w > 0 || L2_w > 0 || PE_w > 0) tot_loss += add_penalty(w, L1_w, L2_w, PE_w);
+    if (L1_h > 0 || L2_h > 0 || PE_h > 0) tot_loss += add_penalty(h, L1_h, L2_h, PE_h);
+    
+    // calculate total loss for all samples
+    arma::mat wd = w * diagmat(d);
+    #pragma omp parallel for num_threads(threads) schedule(dynamic)
+    for (unsigned int j = 0; j < A.n_cols; ++j) {
+        arma::vec wdh_j = wd * h.col(j);
+        arma::sp_mat::col_iterator it = A.begin_col(j);
+        arma::sp_mat::col_iterator it_end = A.end_col(j);
+        for (; it != it_end; ++it) wdh_j(it.row()) -= *it;
+        if (loss_type == 1) tot_loss += arma::mean(arma::square(wdh_j));
+        else tot_loss += arma::mean(arma::abs(wdh_j));
+    }
+    return(tot_loss / A.n_elem);
 }
 
 arma::mat diagnorm(arma::mat& x, arma::vec& d, const unsigned int threads) {
@@ -345,10 +410,10 @@ Rcpp::List c_nmf(arma::sp_mat& A, const unsigned int k, const double min_w = 0,
     const double L2_w = 0, const double L2_h = 0, const double PE_w = 0,
     const double PE_h = 0, const bool exact_h = false, const bool exact_w = false,
     const bool cd_w = true, const bool cd_h = true, unsigned int maxit = 100,
-    const double tol = 0.01, const unsigned int threads = 0, const bool diag = true,
-    const unsigned int seed = 0, const bool verbose = true) {
+    const double tol_wh = 0.01, const unsigned int threads = 0, const bool diag = true,
+    const bool verbose = true, const bool full_path = false,
+    const double loss = 0, const double tol_loss = 1e-4, const unsigned int trace = 1) {
 
-    if (seed != 0) arma::arma_rng::set_seed(seed);
     arma::mat wt(k, A.n_rows, arma::fill::randu);
     arma::vec d = arma::ones(k);
     arma::mat emptymat = arma::mat(1, 1).zeros();
@@ -356,31 +421,60 @@ Rcpp::List c_nmf(arma::sp_mat& A, const unsigned int k, const double min_w = 0,
     arma::mat h = c_nnls(wt, A, emptymat, emptyvec, threads, min_h, max_h, cd_maxit, cd_tol,
         L0_h, L1_h, L2_h, PE_h, exact_h, cd_h);
     arma::sp_mat At = A.t();
-    double tol_it = tol + 1;
-
-    if (verbose) Rprintf("\n%10s | %10s\n----------------------------\n", "iter", "rel tol");
-
+    double tol_h_it = tol_wh + 1;
+    double tol_w_it = tol_wh + 1;
+    double tol_wh_it = tol_wh + 1;
+    double tol_loss_it = tol_loss + 1;
+    double loss_it = 0;
+    double loss_it_prev = 0;
+    // records of unsorted w, h, and d from all iterations
+    arma::cube full_path_w(A.n_rows, k, maxit);
+    arma::mat full_path_d(k, maxit);
+    arma::cube full_path_h(k, A.n_cols, maxit, arma::fill::zeros);
+    arma::vec full_path_tols_wh(maxit);
+    arma::vec full_path_tols_loss(maxit);
+    arma::vec full_path_loss(maxit);
+    arma::vec full_path_iters(maxit);
     arma::mat h_new = h;
+    arma::mat wt_new = wt;
+    arma::mat x_init;
+    bool converged = false;
+
+    if (loss == 1) loss_it = mean(mean(square(A - wt.t() * h)));
+    else if (loss == 2) loss_it = mean(mean(abs(A - wt.t() * h)));
+
+    if (verbose) {
+        if (loss != 0)
+            Rprintf("%10s | %10s | %10s | %10s \n--------------------------------------------------\n",
+                "iter", "loss", "rel loss", "tol wh");
+        else
+            Rprintf("%10s | %10s \n--------------------------------\n",
+                "iter", "tol wh");
+    }
+
     unsigned int it = 1;
-    for (; it <= maxit && tol_it > tol; ++it) {
+    for (; it <= maxit && !converged; ++it) {
         Rcpp::checkUserInterrupt();
         // update wt
-        // optionally subsample features
+        // note that a cold start is used.
+        //   ...that's because FAST + CD is always faster than CD even from a warm start
         arma::mat hd = diagmult(h, d, threads);
-        wt = c_nnls(hd, At, emptymat, emptyvec, threads, min_w, max_w,
+        wt_new = c_nnls(hd, At, emptymat, emptyvec, threads, min_w, max_w,
             cd_maxit, cd_tol, L0_w, L1_w, L2_w, PE_w, exact_w, cd_w);
 
+        // calculate tolerance between wt and wt_new
+        tol_w_it = calc_tol(wt, wt_new, threads) / wt.n_cols;
+        wt = wt_new;
+
         // update h
-        // optionally subsample samples
         arma::mat wtd = diagmult(wt, d, threads);
         h_new = c_nnls(wtd, A, emptymat, emptyvec, threads, min_h, max_h,
             cd_maxit, cd_tol, L0_h, L1_h, L2_h, PE_h, exact_h, cd_h);
 
         // calculate tolerance between h and h_new
-        tol_it = calc_tol(h, h_new, threads) / h.n_cols;
+        tol_h_it = calc_tol(h, h_new, threads) / h.n_cols;
+        tol_wh_it = tol_w_it * tol_h_it;
         h = h_new;
-
-        if (verbose) Rprintf("%10d | %10.4f\n", it, tol_it);
 
         // scale factors in "w" and "h" to sum to 1, update diagonal
         if (diag) {
@@ -390,21 +484,66 @@ Rcpp::List c_nmf(arma::sp_mat& A, const unsigned int k, const double min_w = 0,
             h = diagnorm(h, h_sums, threads);
             d %= (wt_sums % h_sums);
         }
+
+        if (loss != 0 && ((it - 1) % trace == 0 || it % trace == 0)) {
+            Rcpp::checkUserInterrupt();
+            loss_it_prev = loss_it;
+
+            loss_it = c_loss(wt.t(), d, h, A, L1_w, L1_h, L2_w, L2_h, PE_w, PE_h, loss, threads);
+        }
+
+        if (it % trace == 0) {
+            // record intermediate solutions is full_path = true
+            if (full_path) {
+                full_path_w.slice(it - 1) = wt.t();
+                full_path_d.col(it - 1) = d;
+                full_path_h.slice(it - 1) = h;
+                full_path_tols_wh(it - 1) = tol_wh_it;
+                full_path_tols_loss(it - 1) = tol_loss_it;
+                full_path_loss(it - 1) = loss_it;
+                full_path_iters(it - 1) = it;
+            }
+
+            // check all possible convergence criteria for convergence
+            if (loss != 0) {
+                tol_loss_it = 2 * (std::abs(loss_it_prev - loss_it)) / (loss_it_prev + loss_it);
+                if (tol_loss_it < tol_loss) converged = true;
+            }
+            if (tol_wh_it < tol_wh) converged = true;
+
+            // verbose updates
+            if (verbose) {
+                if (loss != 0)
+                    Rprintf("%10d | %10.5f | %10.5f | %10.5f \n",
+                        it, loss_it, tol_loss_it, tol_wh_it);
+                else
+                    Rprintf("%10d | %10.5f \n", it, tol_wh_it);
+            }
+        }
     }
 
     // sort factors by diagonal weights
     inplace_trans(wt);
-    if(diag){
-        arma::uvec indices = sort_index(d, "descend");
-        d = d.elem(indices);
-        wt = wt.cols(indices);
-        h = h.rows(indices);
-    }
 
-    return(Rcpp::List::create(
-        Rcpp::Named("w") = wt,
-        Rcpp::Named("d") = d,
-        Rcpp::Named("h") = h,
-        Rcpp::Named("tol") = tol_it,
-        Rcpp::Named("iter") = it));
+    if (!full_path) {
+        return(Rcpp::List::create(
+            Rcpp::Named("w") = wt,
+            Rcpp::Named("d") = d,
+            Rcpp::Named("h") = h,
+            Rcpp::Named("loss") = loss_it,
+            Rcpp::Named("tol_wh") = tol_wh_it,
+            Rcpp::Named("tol_loss") = tol_loss_it,
+            Rcpp::Named("iter") = it
+        ));
+    } else {
+        return(Rcpp::List::create(
+            Rcpp::Named("w") = full_path_w,
+            Rcpp::Named("d") = full_path_d.cols(0, it - 2),
+            Rcpp::Named("h") = full_path_h,
+            Rcpp::Named("loss") = full_path_loss(arma::span(0, it - 2)),
+            Rcpp::Named("tol_wh") = full_path_tols_wh(arma::span(0, it - 2)),
+            Rcpp::Named("tol_loss") = full_path_tols_loss(arma::span(0, it - 2)),
+            Rcpp::Named("iter") = full_path_iters(arma::span(0, it - 2))
+        ));
+    }
 }
