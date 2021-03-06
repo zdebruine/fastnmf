@@ -1,6 +1,5 @@
-# amf
-Alternating Matrix Factorization
-
+# fastnmf
+Fast non-negative matrix factorization
 3/4 initial commit
 
 3/5 
