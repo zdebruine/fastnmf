@@ -2,27 +2,31 @@
 % Please edit documentation in R/nmf.R
 \name{nmf}
 \alias{nmf}
-\title{Non-negative matrix factorization}
+\title{Alternating matrix factorization}
 \usage{
 nmf(
   A,
   k,
-  min = c(0, 0),
-  max = c(NULL, NULL),
-  L0 = c(NULL, NULL),
-  L1 = c(0, 0),
-  L2 = c(0, 0),
-  PE = c(0, 0),
-  exact = c(FALSE, FALSE),
-  cd = c(TRUE, TRUE),
+  min = 0,
+  max = NULL,
+  L0 = NULL,
+  L1 = 0,
+  L2 = 0,
+  PE = 0,
+  exact = FALSE,
+  cd = FALSE,
+  trace = 1,
   maxit = 100,
   maxit_cd = 100,
-  tol = 0.01,
   tol_cd = 1e-08,
   diag = TRUE,
   seed = NULL,
   threads = 0,
   verbose = TRUE,
+  full_path = FALSE,
+  tol_wh = 0.001,
+  loss = NULL,
+  tol_loss = 0.001,
   ...
 )
 }
@@ -57,11 +61,12 @@ Vector of two for \code{c(w, h)}.}
 
 \item{cd}{use coordinate descent to refine the solution? Vector of two for \code{c(w, h)}}
 
+\item{trace}{calculate applicable tolerances / losses every trace iterations, and check for
+convergence}
+
 \item{maxit}{maximum number of alternating updates of \eqn{w} and \eqn{h}}
 
 \item{maxit_cd}{in coordinate descent, maximum number of iterations}
-
-\item{tol}{relative change in \eqn{h} between consecutive iterations at convergence}
 
 \item{tol_cd}{in coordinate descent, distance of solution from maximum gradient residual at
 convergence}
@@ -76,16 +81,43 @@ either 0 (all available threads, default) 1 (no parallelization), or any valid n
 
 \item{verbose}{show tolerance for each iteration}
 
+\item{full_path}{return all intermediate models in addition to the final model (default FALSE)}
+
+\item{tol_wh}{stop factorizing when the relative change in \eqn{h} multiplied by the relative
+change in \eqn{w} between consecutive iterations falls below this value.}
+
+\item{loss}{One of c(\code{NULL}, \code{"mse"}, \code{"mae"}) to either not calculate loss
+(which is computationally expensive) or to calculate mean squared or absolute error of the
+factorization every \code{trace} iterations (and potentially use loss as a convergence criteria
+by specifying \code{tol_loss}). NULL by default, because loss calculations are slower than the
+factorization itself.}
+
+\item{tol_loss}{stop factorizing when the relative change in loss between consecutive iterations
+falls below this value. If \code{loss} is not NULL, loss tolerance will be calculated.}
+
 \item{...}{additional parameters}
+
+\item{tol_wh_switch_to_cd}{begin using coordinate descent solver exclusively at this tolerance,
+as opposed to cold-start consisting of FAST initialization followed by coordinate descent.}
 }
 \value{
-A list of \code{w}, \code{d}, and \code{h} giving the factorization result, and
-\code{iter} giving the number of iterations required to converge, and \code{tol} giving the
-relative change in \eqn{h} between the last two iterations.
+An \code{\link{nmfmodel}} object with slots:
+\itemize{
+\item \code{w}: matrix of \emph{features x factors} of dimensions \emph{m x k}
+\item \code{d}: diagonal scaling vector of length \emph{k}
+\item \code{h}: matrix of \emph{factors x samples} of dimensions \emph{k x n}
+\item \code{loss}: mean squared/absolute error of the model (if \code{loss} is not NULL)
+\item \code{tol_wh}: tolerance of change in \emph{w} multiplied by the change in \emph{h} between
+the last two consecutive iterations
+\item \code{tol_loss}: mean squared/absolute error of the model (if \code{loss} is not NULL)
+\item \code{it}: number of iterations used to solve the model
+\item \code{path}: a list of \code{\link{nmfmodel}} objects containing intermediate model states
+along the full solution path (if \code{full_path = TRUE})
+}
 }
 \description{
-NMF by alternating constrained least squares with fast solvers and an efficient
-stopping criteria.
+Non-negative matrix factorization, or other constrained factorization, by
+alternating constrained least squares with fast solvers and efficient stopping criteria.
 }
 \details{
 NMF solves the equation \deqn{A = WH} by minimizing \eqn{A - WH}. In NMF by alternating least
@@ -94,7 +126,7 @@ progress towards the objective is measured indirectly by the rate of change in \
 consecutive iterations.
 \subsection{Model diagonalization}{
 
-By default, \code{amf::nmf} scales columns in \eqn{w} and rows in \eqn{h} to sum to 1 by
+By default, \code{nmf} scales columns in \eqn{w} and rows in \eqn{h} to sum to 1 by
 introducing a "scaling diagonal":
 \deqn{A = WDH}
 This is important in several ways:
@@ -130,5 +162,5 @@ In the future, support will be added for warm-start solvers if they are faster.
 }
 }
 \seealso{
-\code{\link{nnls}}
+\code{\link{nnls}}, \code{\link{nmfmodel-class}}
 }
