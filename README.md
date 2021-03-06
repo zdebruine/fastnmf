@@ -16,8 +16,9 @@ Wrap detailed nmf parameters into an S4 "nmfParams" object
 add multinomial constraints to nmf
 
 SATURDAY
+check exact nnls with coordinate descent to see if solution improves.
+
 - Write near-exact nnls to stochastically sample sparse active sets with gradient descent
-- Add coordinate descent parameter to exact nnls, but restrict coordinate descent to the feasible set. cd = TRUE is already an option in nnls adaptive solver, integrate directly. Always check to see if the solution is improved.
 - Write an nnlsmodel S4 object similar to nmfmodel.
 - Add full solution path to nnlsmodel if detail = TRUE
 - S4 method for nnlsmodel for rasterized UMAP of solutions. PCA -> RcppAnnoy nearest neighbors -> uwot::UMAP -> ggplot2 raster
