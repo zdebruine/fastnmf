@@ -2,10 +2,14 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 c_nnls <- function(A, B, X, values, threads = 0L, min = 0, max = 0, maxit = 50L, tol = 1e-8, L0 = 0, L1 = 0, L2 = 0, PE = 0, exact = FALSE, cd = TRUE) {
-    .Call(`_amf_c_nnls`, A, B, X, values, threads, min, max, maxit, tol, L0, L1, L2, PE, exact, cd)
+    .Call(`_fastnmf_c_nnls`, A, B, X, values, threads, min, max, maxit, tol, L0, L1, L2, PE, exact, cd)
 }
 
-c_nmf <- function(A, k, min_w = 0, min_h = 0, max_w = 0, max_h = 0, cd_maxit = 50L, cd_tol = 1e-8, L0_w = 0, L0_h = 0, L1_w = 0, L1_h = 0, L2_w = 0, L2_h = 0, PE_w = 0, PE_h = 0, exact_h = FALSE, exact_w = FALSE, cd_w = TRUE, cd_h = TRUE, maxit = 100L, tol = 0.01, threads = 0L, diag = TRUE, seed = 0L, verbose = TRUE) {
-    .Call(`_amf_c_nmf`, A, k, min_w, min_h, max_w, max_h, cd_maxit, cd_tol, L0_w, L0_h, L1_w, L1_h, L2_w, L2_h, PE_w, PE_h, exact_h, exact_w, cd_w, cd_h, maxit, tol, threads, diag, seed, verbose)
+c_sample_loss <- function(w, d, h, A, L1_w = 0, L1_h = 0, L2_w = 0, L2_h = 0, PE_w = 0, PE_h = 0, loss_type = 1L, threads = 0L) {
+    .Call(`_fastnmf_c_sample_loss`, w, d, h, A, L1_w, L1_h, L2_w, L2_h, PE_w, PE_h, loss_type, threads)
+}
+
+c_nmf <- function(A, k, min_w = 0, min_h = 0, max_w = 0, max_h = 0, cd_maxit = 50L, cd_tol = 1e-8, L0_w = 0, L0_h = 0, L1_w = 0, L1_h = 0, L2_w = 0, L2_h = 0, PE_w = 0, PE_h = 0, exact_h = FALSE, exact_w = FALSE, cd_w = TRUE, cd_h = TRUE, maxit = 100L, tol_wh = 0.01, threads = 0L, diag = TRUE, verbose = TRUE, full_path = FALSE, loss = 0, tol_loss = 1e-4, trace = 1L) {
+    .Call(`_fastnmf_c_nmf`, A, k, min_w, min_h, max_w, max_h, cd_maxit, cd_tol, L0_w, L0_h, L1_w, L1_h, L2_w, L2_h, PE_w, PE_h, exact_h, exact_w, cd_w, cd_h, maxit, tol_wh, threads, diag, verbose, full_path, loss, tol_loss, trace)
 }
 
